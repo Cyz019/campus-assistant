@@ -23,25 +23,35 @@ def rag_answer(question, history=None):
     docs = vector_db.similarity_search(question, k=5)
     context = "\n\n".join([d.page_content for d in docs])
     
-    # 2. 构建提示词
-    prompt = RAG_PROMPT.format(context=context, question=question)
-    
-    # 3. 构建消息列表（包含历史对话）
-    messages = []
-    
-    # 如果有历史对话，加入上下文（最多保留最近4轮）
+    # 2. 构建对话历史文本
+    history_text = ""
     if history:
-        for msg in history[-4:]:
-            messages.append({"role": msg["role"], "content": msg["content"]})
+        # 只取最近4轮对话
+        recent = history[-4:]
+        history_text = "\n".join([f"{msg['role']}: {msg['content']}" for msg in recent])
+        history_text = f"【对话历史】\n{history_text}\n\n"
     
-    # 添加当前问题
-    messages.append({"role": "user", "content": prompt})
+    # 3. 构建提示词（把历史拼进去）
+    full_prompt = f"""{history_text}【校园规则】
+{context}
+
+【当前问题】
+{question}
+
+【回答要求】
+1. 如果用户在对话历史中告诉过你他的名字或其他信息，请记住并使用
+2. 只根据上面的规则回答校园问题
+3. 如果规则里没有相关信息，说"我不确定，建议咨询辅导员"
+4. 回答要简洁、友好
+
+【回答】
+"""
     
     # 4. 调用大模型生成回答
     try:
         response = client.chat.completions.create(
             model="deepseek-chat",
-            messages=messages,
+            messages=[{"role": "user", "content": full_prompt}],
             temperature=0.3
         )
         return response.choices[0].message.content
