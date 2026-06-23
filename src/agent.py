@@ -18,11 +18,10 @@ def agent_chat(user_input):
     # 2. 绩点计算（必须有2个以上的数字）
     elif ("绩点" in user_input or "GPA" in user_input or "gpa" in user_input):
         scores = re.findall(r'\d+', user_input)
-        if len(scores) >= 2:  # 至少2个分数才计算
+        if len(scores) >= 2:
             response = calculate_gpa(', '.join(scores))
         else:
-            # 单个数字或没有数字，走RAG问答
-            response = rag_answer(user_input)
+            response = rag_answer(user_input, conversation_history)
     
     # 3. 打招呼
     elif user_input in ["你好", "您好", "hi", "hello", "在吗"]:
@@ -37,9 +36,9 @@ def agent_chat(user_input):
 4. 闲聊对话
 试试问我一个问题吧！"""
     
-    # 5. 默认走RAG问答
+    # 5. 默认走RAG问答（传入历史）
     else:
-        response = rag_answer(user_input)
+        response = rag_answer(user_input, conversation_history)
     
     conversation_history.append({"role": "assistant", "content": response})
     return response
@@ -50,28 +49,3 @@ def get_history():
 def clear_history():
     conversation_history.clear()
     return "对话历史已清空"
-
-# 测试
-if __name__ == "__main__":
-    print("="*50)
-    print("🧪 测试智能体功能")
-    print("="*50 + "\n")
-    
-    print("测试1: 现在第几周？")
-    print(agent_chat("现在第几周？"))
-    print("-"*40)
-    
-    print("\n测试2: 绩点计算 85,90,78")
-    print(agent_chat("绩点计算 85,90,78"))
-    print("-"*40)
-    
-    print("\n测试3: 奖学金要多少绩点？")
-    print(agent_chat("奖学金要多少绩点？"))
-    print("-"*40)
-    
-    print("\n测试4: 你好")
-    print(agent_chat("你好"))
-    print("-"*40)
-    
-    print("\n✅ 智能体测试完成！")
-    print(f"📝 对话历史共 {len(get_history())} 条记录")

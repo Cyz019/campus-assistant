@@ -17,16 +17,31 @@ client = OpenAI(
 embeddings = HuggingFaceEmbeddings(model_name="BAAI/bge-small-zh")
 vector_db = Chroma(persist_directory='./vector_db', embedding_function=embeddings)
 
-def rag_answer(question):
-    """RAG问答函数：检索 + 生成"""
+def rag_answer(question, history=None):
+    """RAG问答函数：检索 + 生成，支持对话历史"""
+    # 1. 检索相关文档
     docs = vector_db.similarity_search(question, k=5)
     context = "\n\n".join([d.page_content for d in docs])
+    
+    # 2. 构建提示词
     prompt = RAG_PROMPT.format(context=context, question=question)
     
+    # 3. 构建消息列表（包含历史对话）
+    messages = []
+    
+    # 如果有历史对话，加入上下文（最多保留最近4轮）
+    if history:
+        for msg in history[-4:]:
+            messages.append({"role": msg["role"], "content": msg["content"]})
+    
+    # 添加当前问题
+    messages.append({"role": "user", "content": prompt})
+    
+    # 4. 调用大模型生成回答
     try:
         response = client.chat.completions.create(
             model="deepseek-chat",
-            messages=[{"role": "user", "content": prompt}],
+            messages=messages,
             temperature=0.3
         )
         return response.choices[0].message.content
