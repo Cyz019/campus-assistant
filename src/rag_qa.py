@@ -17,21 +17,34 @@ client = OpenAI(
 embeddings = HuggingFaceEmbeddings(model_name="BAAI/bge-small-zh")
 vector_db = Chroma(persist_directory='./vector_db', embedding_function=embeddings)
 
-def rag_answer(question, history=None):
-    """RAG问答函数：检索 + 生成，支持对话历史"""
+def rag_answer(question, history=None, category=None):
+    """
+    RAG问答函数：检索 + 生成，支持对话历史和类别过滤
+    
+    参数:
+        question: 用户问题
+        history: 对话历史列表，格式为 [{"role": "user/assistant", "content": "..."}]
+        category: 可选，指定类别后只检索该类别的内容
+    """
     # 1. 检索相关文档
-    docs = vector_db.similarity_search(question, k=5)
+    if category:
+        # 按类别过滤检索
+        results = vector_db.similarity_search(question, k=5, filter={"category": category})
+    else:
+        # 检索所有类别
+        results = vector_db.similarity_search(question, k=5)
+    
+    docs = results
     context = "\n\n".join([d.page_content for d in docs])
     
     # 2. 构建对话历史文本
     history_text = ""
     if history:
-        # 只取最近4轮对话
-        recent = history[-4:]
+        recent = history[-4:]  # 只取最近4轮
         history_text = "\n".join([f"{msg['role']}: {msg['content']}" for msg in recent])
         history_text = f"【对话历史】\n{history_text}\n\n"
     
-    # 3. 构建提示词（把历史拼进去）
+    # 3. 构建提示词
     full_prompt = f"""{history_text}【校园规则】
 {context}
 
@@ -39,10 +52,11 @@ def rag_answer(question, history=None):
 {question}
 
 【回答要求】
-1. 如果用户在对话历史中告诉过你他的名字或其他信息，请记住并使用
-2. 只根据上面的规则回答校园问题
-3. 如果规则里没有相关信息，说"我不确定，建议咨询辅导员"
-4. 回答要简洁、友好
+1. 如果用户告诉过你名字等信息，请记住并使用
+2. 只根据上面的规则回答
+3. 如果规则里没有相关信息，请用亲切友好的语气回复，示例：
+   "亲爱的同学，这个问题暂时不在当前类别的资料中哦～建议你点击左侧对应的分类按钮，或直接联系辅导员获取准确信息～"
+4. 回答要简洁、友好，语气像学长学姐一样亲切
 
 【回答】
 """
