@@ -1,4 +1,5 @@
 import streamlit as st
+import pandas as pd
 from datetime import datetime
 from agent import agent_chat, get_history, clear_history, set_category, get_category
 
@@ -13,6 +14,22 @@ if "saved_student_id" not in st.session_state:
     st.session_state.saved_student_id = ""
 if "saved_password" not in st.session_state:
     st.session_state.saved_password = ""
+if "detail_category" not in st.session_state:
+    st.session_state.detail_category = None
+if "selected_question" not in st.session_state:
+    st.session_state.selected_question = None
+if "qa_history" not in st.session_state:
+    st.session_state.qa_history = []
+
+# ============================================================
+# 加载数据
+# ============================================================
+@st.cache_data
+def load_campus_data():
+    df = pd.read_csv('data/campus_data.csv')
+    return df
+
+df = load_campus_data()
 
 # ============================================================
 # 登录页面（未登录时显示）
@@ -21,11 +38,35 @@ if not st.session_state.logged_in:
     st.set_page_config(
         page_title="校园小智 - 登录",
         page_icon="🎓",
-        layout="centered"
+        layout="centered",
+        initial_sidebar_state="collapsed"
     )
 
     st.markdown("""
     <style>
+        /* 隐藏侧边栏 */
+        section[data-testid="stSidebar"] {
+            display: none !important;
+        }
+        /* 隐藏右上角的菜单按钮 */
+        button[kind="header"] {
+            display: none !important;
+        }
+        /* 隐藏页面导航 */
+        .stSidebarNav {
+            display: none !important;
+        }
+        /* 隐藏顶部导航 */
+        .stAppHeader {
+            display: none !important;
+        }
+        header[data-testid="stHeader"] {
+            display: none !important;
+        }
+        nav[data-testid="stSidebarNav"] {
+            display: none !important;
+        }
+        
         .stApp {
             background: linear-gradient(160deg, #1a2a4a 0%, #2a5a9a 50%, #3a7abd 100%);
             display: flex;
@@ -252,100 +293,141 @@ if not st.session_state.logged_in:
 st.set_page_config(
     page_title="校园小智",
     page_icon="🎓",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
+
+# ============================================================
+# 移除导航文字 - 保留侧边栏
+# ============================================================
+st.components.v1.html("""
+<script>
+(function() {
+    function removeNavTexts() {
+        // 1. 移除所有包含 "app" 和 "category" 的文本节点
+        var walker = document.createTreeWalker(
+            document.body,
+            NodeFilter.SHOW_TEXT,
+            {
+                acceptNode: function(node) {
+                    var text = node.textContent.trim();
+                    if (text === 'app' || text === 'category detail' || 
+                        text === 'categorydetail' || text === 'category_detail' ||
+                        text === 'category' || text === 'detail') {
+                        return NodeFilter.FILTER_ACCEPT;
+                    }
+                    return NodeFilter.FILTER_REJECT;
+                }
+            }
+        );
+        var nodesToRemove = [];
+        var node;
+        while (node = walker.nextNode()) {
+            nodesToRemove.push(node);
+        }
+        for (var i = 0; i < nodesToRemove.length; i++) {
+            var n = nodesToRemove[i];
+            if (n.parentNode) {
+                n.parentNode.removeChild(n);
+            }
+        }
+        
+        // 2. 移除包含这些文字的父元素（如果父元素只有这些文字）
+        var allElements = document.querySelectorAll('*');
+        for (var i = 0; i < allElements.length; i++) {
+            var el = allElements[i];
+            if (el.childNodes.length === 1 && el.childNodes[0].nodeType === 3) {
+                var text = el.textContent.trim();
+                if (text === 'app' || text === 'category detail' || 
+                    text === 'categorydetail' || text === 'category_detail') {
+                    el.remove();
+                }
+            }
+        }
+        
+        // 3. 移除面包屑导航（但保留侧边栏）
+        var allDivs = document.querySelectorAll('div');
+        for (var d = 0; d < allDivs.length; d++) {
+            var div = allDivs[d];
+            if (div.textContent && div.textContent.includes('/') && 
+                div.textContent.includes('app')) {
+                div.remove();
+            }
+        }
+    }
+    
+    // 立即执行
+    removeNavTexts();
+    // 多次延迟执行确保动态加载完成
+    setTimeout(removeNavTexts, 100);
+    setTimeout(removeNavTexts, 300);
+    setTimeout(removeNavTexts, 500);
+    setTimeout(removeNavTexts, 1000);
+    
+    // 监听页面变化
+    var observer = new MutationObserver(function() {
+        removeNavTexts();
+    });
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        characterData: true
+    });
+})();
+</script>
+<style>
+    /* 只隐藏面包屑导航，不隐藏侧边栏 */
+    .stBreadcrumbs, .stBreadcrumbs *,
+    .stPageTitle, .stPageTitle * {
+        display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+        width: 0 !important;
+        overflow: hidden !important;
+        position: absolute !important;
+        top: -9999px !important;
+        left: -9999px !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: 0 !important;
+        min-height: 0 !important;
+        max-height: 0 !important;
+    }
+    
+    /* 保留侧边栏 */
+    section[data-testid="stSidebar"] {
+        display: flex !important;
+        visibility: visible !important;
+        height: auto !important;
+        width: auto !important;
+        overflow: visible !important;
+        position: relative !important;
+        top: auto !important;
+        left: auto !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+    }
+</style>
+""", height=0)
 
 st.markdown("""
 <style>
     .stApp {
         background: linear-gradient(160deg, #eef0f5 0%, #e2e6ef 50%, #d5dce8 100%);
     }
-    .chat-wrapper {
-        background: rgba(255, 255, 255, 0.35);
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
-        border-radius: 20px;
-        padding: 24px 28px;
-        border: 1px solid rgba(255, 255, 255, 0.5);
-        box-shadow: 0 8px 40px rgba(0,0,0,0.04);
-        min-height: 500px;
-        transition: all 0.3s ease;
-    }
-    .main-header {
-        text-align: center;
-        padding: 2.2rem 0 1.8rem 0;
-        background: linear-gradient(135deg, #0b1a33 0%, #1a3a6b 45%, #1e4d8a 100%);
-        border-radius: 18px;
-        color: white;
-        margin-bottom: 1.8rem;
-        box-shadow: 0 12px 40px rgba(10, 30, 70, 0.35);
-        border: 1px solid rgba(255, 215, 0, 0.08);
-        position: relative;
-        overflow: hidden;
-    }
-    .main-header::before {
-        content: '';
-        position: absolute;
-        top: -60%;
-        right: -20%;
-        width: 60%;
-        height: 200%;
-        background: radial-gradient(ellipse, rgba(255, 215, 0, 0.04) 0%, transparent 70%);
-        pointer-events: none;
-    }
-    .main-header::after {
-        content: '';
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        height: 3px;
-        background: linear-gradient(90deg, transparent, #FFD700, #FFD700, transparent);
-        opacity: 0.3;
-    }
-    .main-header h1 {
-        font-size: 2.8rem;
-        margin: 0;
-        font-weight: 700;
-        letter-spacing: 4px;
-        position: relative;
-    }
-    .main-header h1 .gold {
-        color: #FFD700;
-        text-shadow: 0 0 30px rgba(255, 215, 0, 0.15);
-    }
-    .main-header .sub {
-        font-size: 1rem;
-        opacity: 0.6;
-        margin: 8px 0 0 0;
-        letter-spacing: 8px;
-        font-weight: 300;
-        position: relative;
-    }
-    .main-header .badge-row {
-        display: flex;
-        justify-content: center;
-        gap: 12px;
-        margin-top: 14px;
-        flex-wrap: wrap;
-        position: relative;
-    }
-    .main-header .badge-item {
-        background: rgba(255, 215, 0, 0.06);
-        border: 1px solid rgba(255, 215, 0, 0.08);
-        padding: 4px 18px;
-        border-radius: 30px;
-        font-size: 0.75rem;
-        color: rgba(255, 215, 0, 0.6);
-        letter-spacing: 1px;
-    }
+    
+    /* ===== 侧边栏样式 - 深蓝色渐变 ===== */
     section[data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #0b1a33 0%, #122a4f 40%, #183a6a 100%) !important;
-        border-right: 1px solid rgba(255, 215, 0, 0.06);
+        background: linear-gradient(180deg, #0b1a33 0%, #1a3a6b 45%, #1e4d8a 100%) !important;
+        border-right: 1px solid rgba(255, 215, 0, 0.08);
     }
+    
     section[data-testid="stSidebar"] * {
         color: rgba(255, 255, 255, 0.85) !important;
     }
+    
     .sidebar-title {
         font-size: 0.85rem;
         font-weight: 600;
@@ -368,8 +450,8 @@ st.markdown("""
         letter-spacing: 1.5px;
     }
     .current-category-card {
-        background: rgba(255, 215, 0, 0.04);
-        border: 1px solid rgba(255, 215, 0, 0.06);
+        background: rgba(255, 215, 0, 0.06);
+        border: 1px solid rgba(255, 215, 0, 0.08);
         border-radius: 12px;
         padding: 12px 16px;
         margin-bottom: 12px;
@@ -379,7 +461,7 @@ st.markdown("""
     }
     .current-category-card .label {
         font-size: 0.7rem;
-        color: rgba(255, 255, 255, 0.3);
+        color: rgba(255, 255, 255, 0.4);
         letter-spacing: 1px;
         text-transform: uppercase;
     }
@@ -390,12 +472,12 @@ st.markdown("""
         letter-spacing: 1px;
     }
     .current-category-card .value.all {
-        color: rgba(255, 255, 255, 0.4);
+        color: rgba(255, 255, 255, 0.5);
         font-weight: 400;
     }
     .stat-card {
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid rgba(255, 255, 255, 0.04);
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.06);
         border-radius: 10px;
         padding: 10px 12px;
         text-align: center;
@@ -408,7 +490,7 @@ st.markdown("""
     }
     .stat-card .desc {
         font-size: 0.6rem;
-        color: rgba(255, 255, 255, 0.3);
+        color: rgba(255, 255, 255, 0.4);
         letter-spacing: 1px;
         text-transform: uppercase;
         margin-top: 2px;
@@ -548,7 +630,75 @@ st.markdown("""
         background: rgba(26, 58, 107, 0.25);
     }
 
-    /* 顶部功能栏卡片 */
+    .main-header {
+        text-align: center;
+        padding: 2.2rem 0 1.8rem 0;
+        background: linear-gradient(135deg, #0b1a33 0%, #1a3a6b 45%, #1e4d8a 100%);
+        border-radius: 18px;
+        color: white;
+        margin-bottom: 1.8rem;
+        box-shadow: 0 12px 40px rgba(10, 30, 70, 0.35);
+        border: 1px solid rgba(255, 215, 0, 0.08);
+        position: relative;
+        overflow: hidden;
+    }
+    .main-header::before {
+        content: '';
+        position: absolute;
+        top: -60%;
+        right: -20%;
+        width: 60%;
+        height: 200%;
+        background: radial-gradient(ellipse, rgba(255, 215, 0, 0.04) 0%, transparent 70%);
+        pointer-events: none;
+    }
+    .main-header::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: linear-gradient(90deg, transparent, #FFD700, #FFD700, transparent);
+        opacity: 0.3;
+    }
+    .main-header h1 {
+        font-size: 2.8rem;
+        margin: 0;
+        font-weight: 700;
+        letter-spacing: 4px;
+        position: relative;
+    }
+    .main-header h1 .gold {
+        color: #FFD700;
+        text-shadow: 0 0 30px rgba(255, 215, 0, 0.15);
+    }
+    .main-header .sub {
+        font-size: 1rem;
+        opacity: 0.6;
+        margin: 8px 0 0 0;
+        letter-spacing: 8px;
+        font-weight: 300;
+        position: relative;
+    }
+    .main-header .badge-row {
+        display: flex;
+        justify-content: center;
+        gap: 12px;
+        margin-top: 14px;
+        flex-wrap: wrap;
+        position: relative;
+    }
+    .main-header .badge-item {
+        background: rgba(255, 215, 0, 0.06);
+        border: 1px solid rgba(255, 215, 0, 0.08);
+        padding: 4px 18px;
+        border-radius: 30px;
+        font-size: 0.75rem;
+        color: rgba(255, 215, 0, 0.6);
+        letter-spacing: 1px;
+    }
+
     .func-card {
         background: rgba(255, 255, 255, 0.5);
         backdrop-filter: blur(10px);
@@ -597,7 +747,6 @@ st.markdown("""
         }
     }
 
-    /* 校历表格 */
     .calendar-table {
         width: 100%;
         font-size: 0.75rem;
@@ -655,7 +804,6 @@ st.markdown("""
 
 st.markdown(f'<div class="user-info">👤 欢迎，{st.session_state.student_id}</div>', unsafe_allow_html=True)
 
-# 初始化
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "selected_category" not in st.session_state:
@@ -669,7 +817,6 @@ if "gpa_result" not in st.session_state:
 # 工具函数
 # ============================================================
 def get_calendar_data():
-    """获取校历表格数据"""
     calendar_data = {
         "周次": list(range(1, 21)),
         "日期": [
@@ -688,7 +835,6 @@ def get_calendar_data():
     return calendar_data
 
 def get_current_week_info():
-    """获取当前周数信息"""
     today = datetime.now()
     semester_start = datetime(2026, 3, 2)
     summer_start = datetime(2026, 7, 18)
@@ -704,7 +850,6 @@ def get_current_week_info():
     return {"week": week_num, "status": f"第{week_num}周", "msg": f"📅 当前是2025-2026学年第二学期第 {week_num} 周"}
 
 def calc_gpa(scores_str):
-    """计算绩点"""
     try:
         scores = [float(x.strip()) for x in scores_str.split(',') if x.strip()]
         total = 0
@@ -725,11 +870,10 @@ def calc_gpa(scores_str):
         return "❌ 格式错误，请用逗号分隔，如：85,90,78"
 
 # ============================================================
-# 顶部功能栏（三列卡片）
+# 顶部功能栏
 # ============================================================
 st.markdown('<div class="func-row">', unsafe_allow_html=True)
 
-# ---- 功能1：校历查询 ----
 with st.container():
     st.markdown("""
     <div class="func-card">
@@ -737,26 +881,21 @@ with st.container():
         <div class="func-content">
     """, unsafe_allow_html=True)
     
-    # 使用 pandas 创建校历表格
-    import pandas as pd
     cal_data = get_calendar_data()
     current_week_info = get_current_week_info()
     current_week = current_week_info["week"]
     
-    # 创建 DataFrame
     df_cal = pd.DataFrame({
         "周次": cal_data["周次"],
         "日期": cal_data["日期"],
         "事项": cal_data["事项"]
     })
     
-    # 高亮当前周 - 使用 styler
     def highlight_current_week(row):
         if row.name + 1 == current_week and current_week > 0:
             return ['background-color: rgba(255, 215, 0, 0.15); font-weight: bold; color: #1a3a6b;'] * len(row)
         return [''] * len(row)
     
-    # 应用样式
     styled_df = df_cal.style.apply(highlight_current_week, axis=1)
     styled_df = styled_df.set_properties(**{
         'text-align': 'center',
@@ -784,12 +923,10 @@ with st.container():
     ])
     
     st.dataframe(styled_df, use_container_width=True, height=350)
-    
     status_msg = current_week_info["msg"]
     st.markdown(f'<div class="week-status">{status_msg}</div>', unsafe_allow_html=True)
-    
     st.markdown("</div></div>", unsafe_allow_html=True)
-# ---- 功能2：绩点计算 ----
+
 with st.container():
     st.markdown("""
     <div class="func-card">
@@ -811,10 +948,8 @@ with st.container():
         st.markdown(f"<p style='font-size:0.9rem;color:#1a3a6b;font-weight:500;'>{st.session_state.gpa_result}</p>", unsafe_allow_html=True)
     else:
         st.markdown("<p style='font-size:0.75rem;color:#8a9bb5;'>输入各科成绩，用逗号分隔</p>", unsafe_allow_html=True)
-    
     st.markdown("</div></div>", unsafe_allow_html=True)
 
-# ---- 功能3：历史对话 ----
 with st.container():
     st.markdown("""
     <div class="func-card">
@@ -839,7 +974,6 @@ with st.container():
             st.markdown("<p style='font-size:0.8rem;color:#8a9bb5;'>暂无对话记录</p>", unsafe_allow_html=True)
     else:
         st.markdown("<p style='font-size:0.75rem;color:#8a9bb5;'>点击按钮查看历史对话</p>", unsafe_allow_html=True)
-    
     st.markdown("</div></div>", unsafe_allow_html=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
@@ -893,7 +1027,7 @@ with st.sidebar:
     st.divider()
 
     st.markdown('<div class="sidebar-title"><span class="icon">📋</span> 选择类别</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sidebar-sub">点击后，在下方提问</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sidebar-sub">点击后，跳转到该类别的详情页面</div>', unsafe_allow_html=True)
 
     categories = {
         "📝 请假": "请假", "💰 奖学金": "奖学金", "🔧 报修": "报修", "💳 一卡通": "一卡通",
@@ -913,9 +1047,10 @@ with st.sidebar:
     for i, (label, category) in enumerate(categories.items()):
         col = cols[i % 2]
         if col.button(label, use_container_width=True, key=f"cat_{i}"):
-            st.session_state.selected_category = category
-            set_category(category)
-            st.rerun()
+            st.session_state.detail_category = category
+            st.session_state.selected_question = None
+            st.session_state.qa_history = []
+            st.switch_page("pages/category_detail.py")
 
     st.divider()
 
@@ -943,7 +1078,7 @@ with st.sidebar:
     st.markdown('<div class="sidebar-footer">✦ 校园小智 ✦</div>', unsafe_allow_html=True)
 
 # ============================================================
-# 聊天区域
+# 聊天界面
 # ============================================================
 with st.container():
     if st.session_state.selected_category:
